@@ -44,6 +44,11 @@ struct Cipher
         in.getline(baseKey, sizeof(baseKey));
     }
 
+    void setBaseKey(const char* pw)
+    {
+        strcpy(baseKey, pw);
+    }
+
     void getMD5Key(const char* nonce)
     {
         // combine the existing `baseKey' buffer with a `nonce'

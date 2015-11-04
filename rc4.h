@@ -30,7 +30,6 @@
 struct RC4: public Cipher
 {
     unsigned char SBox[256];
-    unsigned char KBox[256];
     unsigned int  key[4];
     unsigned int  keySizeWords;
 
@@ -45,18 +44,21 @@ struct RC4: public Cipher
 
     void init()
     {
+        unsigned char K[256];
         unsigned int i, j;
+
         for (i = 0; i < 256; ++i) SBox[i] = i;
 
-        //for (i = 0; i < 32; ++i) memcpy(KBox + i * 8, key, 8);
+        //for (i = 0; i < 32; ++i) memcpy(K + i * 8, key, 8);
         j = 64/keySizeWords;
         for (i = 0; i < j; ++i)
-            memcpy(KBox + i*keySizeWords*4, key, keySizeWords*4);
+            memcpy(K + i*keySizeWords*4, key, keySizeWords*4);
         
+        // initial permutation of S
         j = 0;
         for (i = 0; i < 256; ++i) 
         {
-            j = (j + SBox[i] + KBox[i]) & 0xff;
+            j = (j + SBox[i] + K[i]) & 0xff;
             unsigned int t = SBox[i];
             SBox[i] = SBox[j];
             SBox[j] = t;

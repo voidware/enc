@@ -626,7 +626,7 @@ int main(int argc, char** argv)
         
     if (argc == 1)
     {
-        std::cerr << "Usage: " << argv[0] << " [-d] [-e] [-inplace] [-ti] [-to] [-k=keyfile] [-checkrandom] [-debug] [-v<version#>] <filename>...\n";
+        std::cerr << "Usage: " << argv[0] << " [-d] [-e] [-inplace] [-ti] [-to] [-k=keyfile] [-p=password] [-checkrandom] [-debug] [-v<version#>] <filename>...\n";
         return 0;
     }
 
@@ -636,6 +636,7 @@ int main(int argc, char** argv)
     bool decode = false;
     const char* keyfile = 0;
     int version = LATEST_VERSION;
+    const char* password = 0;
 
     for (int i = 1; i < argc; ++i) 
     {
@@ -689,6 +690,10 @@ int main(int argc, char** argv)
             std::cerr << "running in debug mode\n";
             debug = true;
         }
+        else if (!strncmp(argv[i], "-p=", 3))
+        {
+            password = argv[i] + 3;
+        }
         else
         {
             std::cerr << "unrecognised option '" << argv[i] << "'\n";
@@ -708,19 +713,26 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if (keyfile)
+    if (password)
     {
-        std::ifstream infile(keyfile, std::ios::in);
-        if (!infile.good()) 
-        {
-            std::cout << "Can't open keyfile " << keyfile << std::endl;
-            return -1;
-        }
-        cipher->getBaseKey(infile, 0);
+        cipher->setBaseKey(password);
     }
     else
     {
-        cipher->getBaseKey(std::cin, "Passphrase: ");
+        if (keyfile)
+        {
+            std::ifstream infile(keyfile, std::ios::in);
+            if (!infile.good()) 
+            {
+                std::cout << "Can't open keyfile " << keyfile << std::endl;
+                return -1;
+            }
+            cipher->getBaseKey(infile, 0);
+        }
+        else
+        {
+            cipher->getBaseKey(std::cin, "Passphrase: ");
+        }
     }
 
     for (int i = 1; i < argc; ++i)
@@ -763,7 +775,8 @@ int main(int argc, char** argv)
 
         cipher->init();
         
-        // warp up the encoder
+        // warm up the keystream generator
+        // NB: some keystreams (eg RC4) suffer from initial short term bias.
         for (int j = 1; j < 257; ++j) cipher->next();
 
         int seed = -1;
