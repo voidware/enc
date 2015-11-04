@@ -357,19 +357,45 @@ static bool seekto(HANDLE fh, int64 pos)
 
 
 static int codeFile(MetaData md,
-                   unsigned int bufSize,
-                   bool inplace,
-                   unsigned int textOptions,
-                   int seed, 
-                   bool encode) // or decode
+                    unsigned int bufSize,
+                    bool inplace,
+                    const char* outname,
+                    unsigned int textOptions,
+                    int seed, 
+                    bool encode) // or decode
 {
     HANDLE outH;
+    bool closeOut = false;
 
     if (!inplace)
     {
-        /* Output goes to stdout */
-        outH = GetStdHandle(STD_OUTPUT_HANDLE);
-        assert(outH != INVALID_HANDLE_VALUE);
+        if (!strcmp(outname, "-"))
+        {
+            /* Output goes to stdout */
+            outH = GetStdHandle(STD_OUTPUT_HANDLE);
+            assert(outH != INVALID_HANDLE_VALUE);
+        }
+        else
+        {
+            DeleteFile(outname);
+            DWORD rw = GENERIC_WRITE;
+            outH = CreateFile(outname,
+                            rw,
+                              0,
+                              0,
+                              CREATE_ALWAYS,
+                              0,
+                              0);
+
+            if (outH == INVALID_HANDLE_VALUE)
+            {
+                std::cerr << "Unable to create output file '"
+                          << outname << "'\n";
+                return -1;
+            }
+            
+            closeOut = true;
+        }
     }
 
     HANDLE fh;
@@ -578,6 +604,7 @@ static int codeFile(MetaData md,
         }
 
         if (closeIn) CloseHandle(fh);
+        if (closeOut) CloseHandle(outH);
     }
     else 
         std::cerr << "Unable to open '" << filename << "'\n";
@@ -789,29 +816,30 @@ int main(int argc, char** argv)
                 return -1;
             }
         }
+
+        // rename file
+        char newname[256];
+
+        if (encode)
+        {
+            // invent a name
+            md.makeScrambledName();
+                    
+            // add ".e<veresion>" suffix
+            strcat(strcpy(newname, md._filepath), md._scrambledName);
+            sprintf(newname + strlen(newname), ".e%d", version);
+        }
+        else
+        {
+            // name without the suffix
+            strcat(strcpy(newname, md._filepath), md._basefilename);
+        }
         
-        if (!codeFile(md, BUFSIZE, inplace, textOptions, seed, encode))
+        if (!codeFile(md, BUFSIZE, inplace, newname, textOptions, seed, encode))
         {
             if (inplace)
             {
-                // rename file
-                char newname[256];
-
-                if (encode)
-                {
-                    // invent a name
-                    md.makeScrambledName();
-                    
-                    // add ".e<veresion>" suffix
-                    strcat(strcpy(newname, md._filepath), md._scrambledName);
-                    sprintf(newname + strlen(newname), ".e%d", version);
-                }
-                else
-                {
-                    // name without the suffix
-                    strcat(strcpy(newname, md._filepath), md._basefilename);
-                }
-                
+                DeleteFile(newname);
                 if (!MoveFile(argv[i], newname))
                 {
                     std::cerr << "WARNING: could not rename " << argv[i]
